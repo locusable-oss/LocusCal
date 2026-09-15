@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "LocusCal",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v15)],
     products: [
         .library(name: "LocusCalCore", targets: ["LocusCalCore"]),
     ],
