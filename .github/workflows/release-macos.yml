@@ -48,16 +48,45 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "Using version $V"
 
+      - name: Select Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls /Applications | grep -i Xcode || true
+          for c in \
+            "/Applications/Xcode_16.4.app" \
+            "/Applications/Xcode_16.3.app" \
+            "/Applications/Xcode_16.2.app" \
+            "/Applications/Xcode_16.1.app" \
+            "/Applications/Xcode_16.0.app" \
+            "/Applications/Xcode_16.app" \
+            "/Applications/Xcode.app"
+          do
+            if [ -d "$c" ]; then
+              sudo xcode-select -s "$c"
+              echo "Using $c"
+              xcodebuild -version
+              exit 0
+            fi
+          done
+          echo "No Xcode 16+ found; will force objectVersion after generate"
+          xcodebuild -version
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
       - name: Generate & build (unsigned)
         id: build
-        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           xcodegen generate
+          # Homebrew XcodeGen may emit objectVersion 77; Xcode 15.4 cannot open it.
+          if [ -f LocusCal.xcodeproj/project.pbxproj ]; then
+            /usr/bin/sed -i '' -E 's/objectVersion = [0-9]+;/objectVersion = 56;/' LocusCal.xcodeproj/project.pbxproj
+            echo "pbxproj objectVersion:"
+            /usr/bin/grep -n "objectVersion" LocusCal.xcodeproj/project.pbxproj | head -3
+          fi
           xcodebuild -project LocusCal.xcodeproj -scheme LocusCal -configuration Release \
             -derivedDataPath build/DerivedData \
             CODE_SIGN_IDENTITY="-" CODE_SIGNING_ALLOWED=YES \
@@ -98,9 +127,8 @@ jobs:
           if [ -f "LocusCal-${V}-macos-unsigned.zip" ]; then
             ASSETS+=("LocusCal-${V}-macos-unsigned.zip")
           fi
-          if git rev-parse -q --verify "refs/tags/${V}" >/dev/null; then
-            gh release create "$V" --title "$V" --notes "$NOTES" "${ASSETS[@]}" || \
-              gh release upload "$V" "${ASSETS[@]}" --clobber
+          if gh release view "$V" >/dev/null 2>&1; then
+            gh release upload "$V" "${ASSETS[@]}" --clobber
           else
             gh release create "$V" --title "$V" --notes "$NOTES" "${ASSETS[@]}"
           fi
