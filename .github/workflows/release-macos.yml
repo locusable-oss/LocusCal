@@ -35,7 +35,6 @@ jobs:
           else
             V="v$(TZ=Asia/Shanghai date +%-Y.%-m.%-d)"
           fi
-          # Same-day bump only when resolving from date (dispatch empty)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -z "${{ github.event.inputs.version }}" ]; then
             N=0
             CAND="$V"
@@ -75,17 +74,15 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate & build (unsigned)
+      - name: Generate, build, make DMG (unsigned)
         id: build
         shell: bash
         run: |
           set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
           xcodegen generate
-          # Homebrew XcodeGen may emit objectVersion 77; Xcode 15.4 cannot open it.
           if [ -f LocusCal.xcodeproj/project.pbxproj ]; then
             /usr/bin/sed -i '' -E 's/objectVersion = [0-9]+;/objectVersion = 56;/' LocusCal.xcodeproj/project.pbxproj
-            echo "pbxproj objectVersion:"
-            /usr/bin/grep -n "objectVersion" LocusCal.xcodeproj/project.pbxproj | head -3
           fi
           xcodebuild -project LocusCal.xcodeproj -scheme LocusCal -configuration Release \
             -derivedDataPath build/DerivedData \
@@ -93,8 +90,17 @@ jobs:
             build
           APP=$(find build/DerivedData/Build/Products -name 'LocusCal.app' -type d | head -1)
           test -n "$APP"
-          ditto -c -k --sequesterRsrc --keepParent "$APP" "LocusCal-${{ steps.ver.outputs.version }}-macos-unsigned.zip"
-          echo "binary=LocusCal-${{ steps.ver.outputs.version }}-macos-unsigned.zip" >> "$GITHUB_OUTPUT"
+          STAGE="build/dmg-stage"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE"
+          ditto "$APP" "$STAGE/LocusCal.app"
+          ln -sf /Applications "$STAGE/Applications"
+          DMG="LocusCal-${V}-macos-unsigned.dmg"
+          rm -f "$DMG"
+          hdiutil create -volname "LocusCal" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+          test -f "$DMG"
+          echo "binary=$DMG" >> "$GITHUB_OUTPUT"
+          ls -la "$DMG"
 
       - name: Source zip
         shell: bash
@@ -120,12 +126,12 @@ jobs:
           LocusCal macOS menu-bar calendar (unsigned / not notarized).
 
           - Source zip (GPL-3.0)
-          - Unsigned .app zip when build succeeds
+          - Unsigned macOS installer DMG
           MD
           )
           ASSETS=("LocusCal-${V}-source.zip")
-          if [ -f "LocusCal-${V}-macos-unsigned.zip" ]; then
-            ASSETS+=("LocusCal-${V}-macos-unsigned.zip")
+          if [ -f "LocusCal-${V}-macos-unsigned.dmg" ]; then
+            ASSETS+=("LocusCal-${V}-macos-unsigned.dmg")
           fi
           if gh release view "$V" >/dev/null 2>&1; then
             gh release upload "$V" "${ASSETS[@]}" --clobber
