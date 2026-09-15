@@ -1,14 +1,15 @@
 name: Release macOS
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       version:
         description: "Version tag e.g. v2026.9.15 (empty = Asia/Shanghai today)"
         required: false
         default: ""
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -19,31 +20,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Resolve version
         id: ver
         shell: bash
         run: |
           set -euo pipefail
-          if [ -n "${{ github.event.inputs.version }}" ]; then
+          if [ "${{ github.event_name }}" = "push" ]; then
+            V="${GITHUB_REF_NAME}"
+          elif [ -n "${{ github.event.inputs.version }}" ]; then
             V="${{ github.event.inputs.version }}"
           else
             V="v$(TZ=Asia/Shanghai date +%-Y.%-m.%-d)"
           fi
-          # If tag exists, bump .N
-          N=0
-          CAND="$V"
-          while git ls-remote --tags origin "refs/tags/${CAND}" | grep -q .; do
-            N=$((N+1))
-            CAND="${V}.${N}"
-          done
-          echo "version=$CAND" >> "$GITHUB_OUTPUT"
-          echo "Using version $CAND"
+          # Same-day bump only when resolving from date (dispatch empty)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -z "${{ github.event.inputs.version }}" ]; then
+            N=0
+            CAND="$V"
+            while git ls-remote --tags origin "refs/tags/${CAND}" | grep -q .; do
+              N=$((N+1))
+              CAND="${V}.${N}"
+            done
+            V="$CAND"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Using version $V"
 
       - name: Install XcodeGen
         run: brew install xcodegen
 
       - name: Generate & build (unsigned)
+        id: build
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -55,17 +65,18 @@ jobs:
           APP=$(find build/DerivedData/Build/Products -name 'LocusCal.app' -type d | head -1)
           test -n "$APP"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "LocusCal-${{ steps.ver.outputs.version }}-macos-unsigned.zip"
+          echo "binary=LocusCal-${{ steps.ver.outputs.version }}-macos-unsigned.zip" >> "$GITHUB_OUTPUT"
 
       - name: Source zip
         shell: bash
         run: |
-          bash scripts/make-source-zip.sh "${{ steps.ver.outputs.version }}"
-          # Remake without .github for cleaner source ship
-          rm -f "LocusCal-${{ steps.ver.outputs.version }}-source.zip"
-          zip -r "LocusCal-${{ steps.ver.outputs.version }}-source.zip" \
-            ACCEPTANCE.md COPYRIGHT LICENSE Makefile Package.swift README.md project.yml \
+          set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          zip -r "LocusCal-${V}-source.zip" \
+            ACCEPTANCE.md COPYRIGHT LICENSE Makefile Package.swift README.md project.yml VERSION \
             LocusCal Sources Tests scripts \
             -x '*.xcuserstate' -x '.DS_Store'
+          test -f "LocusCal-${V}-source.zip"
 
       - name: Create GitHub Release
         env:
@@ -80,11 +91,16 @@ jobs:
           LocusCal macOS menu-bar calendar (unsigned / not notarized).
 
           - Source zip (GPL-3.0)
-          - Optional unsigned .app zip
+          - Unsigned .app zip when build succeeds
           MD
           )
-          gh release create "$V" \
-            --title "$V" \
-            --notes "$NOTES" \
-            "LocusCal-${V}-source.zip" \
-            "LocusCal-${V}-macos-unsigned.zip"
+          ASSETS=("LocusCal-${V}-source.zip")
+          if [ -f "LocusCal-${V}-macos-unsigned.zip" ]; then
+            ASSETS+=("LocusCal-${V}-macos-unsigned.zip")
+          fi
+          if git rev-parse -q --verify "refs/tags/${V}" >/dev/null; then
+            gh release create "$V" --title "$V" --notes "$NOTES" "${ASSETS[@]}" || \
+              gh release upload "$V" "${ASSETS[@]}" --clobber
+          else
+            gh release create "$V" --title "$V" --notes "$NOTES" "${ASSETS[@]}"
+          fi

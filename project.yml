@@ -1,5 +1,7 @@
 name: LocusCal
 options:
+  objectVersion: 60
+  xcodeVersion: "15.0"
   bundleIdPrefix: studio.locusable
   deploymentTarget:
     macOS: "13.0"
