@@ -3,6 +3,7 @@ import AppKit
 
 struct PopoverRootView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,10 +35,13 @@ struct PopoverRootView: View {
 
     private func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
-        if #available(macOS 14.0, *) {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        } else {
-            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+        openWindow(id: "settings")
+        // Bring settings window forward if already open
+        DispatchQueue.main.async {
+            for window in NSApp.windows where window.identifier?.rawValue == "settings"
+                || window.title.contains("设置") {
+                window.makeKeyAndOrderFront(nil)
+            }
         }
     }
 }
