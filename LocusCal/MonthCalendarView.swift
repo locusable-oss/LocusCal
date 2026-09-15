@@ -89,7 +89,7 @@ struct MonthCalendarView: View {
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(today ? Color.accentColor.opacity(0.18) : Color.clear)
-        }
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .strokeBorder(today ? Color.accentColor.opacity(0.6) : Color.clear, lineWidth: 1)
