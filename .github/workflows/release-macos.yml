@@ -1,0 +1,90 @@
+name: Release macOS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag e.g. v2026.9.15 (empty = Asia/Shanghai today)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            V="${{ github.event.inputs.version }}"
+          else
+            V="v$(TZ=Asia/Shanghai date +%-Y.%-m.%-d)"
+          fi
+          # If tag exists, bump .N
+          N=0
+          CAND="$V"
+          while git ls-remote --tags origin "refs/tags/${CAND}" | grep -q .; do
+            N=$((N+1))
+            CAND="${V}.${N}"
+          done
+          echo "version=$CAND" >> "$GITHUB_OUTPUT"
+          echo "Using version $CAND"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate & build (unsigned)
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          xcodebuild -project LocusCal.xcodeproj -scheme LocusCal -configuration Release \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGN_IDENTITY="-" CODE_SIGNING_ALLOWED=YES \
+            build
+          APP=$(find build/DerivedData/Build/Products -name 'LocusCal.app' -type d | head -1)
+          test -n "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "LocusCal-${{ steps.ver.outputs.version }}-macos-unsigned.zip"
+
+      - name: Source zip
+        shell: bash
+        run: |
+          bash scripts/make-source-zip.sh "${{ steps.ver.outputs.version }}"
+          # Remake without .github for cleaner source ship
+          rm -f "LocusCal-${{ steps.ver.outputs.version }}-source.zip"
+          zip -r "LocusCal-${{ steps.ver.outputs.version }}-source.zip" \
+            ACCEPTANCE.md COPYRIGHT LICENSE Makefile Package.swift README.md project.yml \
+            LocusCal Sources Tests scripts \
+            -x '*.xcuserstate' -x '.DS_Store'
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          NOTES=$(cat <<MD
+          ## ${V}
+
+          LocusCal macOS menu-bar calendar (unsigned / not notarized).
+
+          - Source zip (GPL-3.0)
+          - Optional unsigned .app zip
+          MD
+          )
+          gh release create "$V" \
+            --title "$V" \
+            --notes "$NOTES" \
+            "LocusCal-${V}-source.zip" \
+            "LocusCal-${V}-macos-unsigned.zip"
