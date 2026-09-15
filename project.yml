@@ -1,0 +1,35 @@
+name: LocusCal
+options:
+  bundleIdPrefix: studio.locusable
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    PRODUCT_BUNDLE_IDENTIFIER: studio.locusable.LocusCal
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_CFBundleDisplayName: LocusCal
+    INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+    INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026 Locusable Studio"
+    INFOPLIST_KEY_LSUIElement: YES
+    INFOPLIST_KEY_NSCalendarsUsageDescription: "LocusCal can show today’s calendar events in the menu bar popover (read-only)."
+    INFOPLIST_KEY_NSRemindersUsageDescription: "LocusCal can show today’s reminders in the menu bar popover (read-only)."
+targets:
+  LocusCal:
+    type: application
+    platform: macOS
+    sources:
+      - path: LocusCal
+        excludes:
+          - "**/*.md"
+      - path: Sources/LocusCalCore
+    resources:
+      - path: LocusCal/Resources
+    settings:
+      base:
+        PRODUCT_NAME: LocusCal
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_ALLOWED: YES
