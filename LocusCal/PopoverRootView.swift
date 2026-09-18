@@ -31,6 +31,9 @@ struct PopoverRootView: View {
             .padding(10)
         }
         .background(.regularMaterial)
+        // Width only. A fixed height centered this panel and left empty
+        // vertical margins when calendar/reminders were not enabled.
+        .frame(width: 320, alignment: .top)
     }
 
     private func openSettings() {

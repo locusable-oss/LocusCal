@@ -9,7 +9,6 @@ struct LocusCalApp: App {
         MenuBarExtra {
             PopoverRootView()
                 .environmentObject(appState)
-                .frame(width: 320, height: 420)
         } label: {
             Text(appState.menuBarTitle)
         }

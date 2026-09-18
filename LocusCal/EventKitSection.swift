@@ -5,27 +5,21 @@ struct EventKitSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("今天")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(appState.eventKit.statusText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+            Text("今天")
+                .font(.subheadline.weight(.semibold))
             if appState.eventKit.events.isEmpty && appState.eventKit.reminders.isEmpty {
-                Text("暂无事项（或未授权）")
+                Text("暂无事项")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(appState.eventKit.events, id: \.self) { line in
+                ForEach(Array(appState.eventKit.events.enumerated()), id: \.offset) { _, line in
                     Text(line).font(.caption).lineLimit(1)
                 }
-                ForEach(appState.eventKit.reminders, id: \.self) { line in
+                ForEach(Array(appState.eventKit.reminders.enumerated()), id: \.offset) { _, line in
                     Text("☐ \(line)").font(.caption).lineLimit(1)
                 }
             }
-            Button("刷新 / 请求权限") {
+            Button("刷新") {
                 Task {
                     await appState.eventKit.requestAccessIfNeeded()
                 }

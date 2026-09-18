@@ -18,6 +18,8 @@ settings:
     INFOPLIST_KEY_LSUIElement: YES
     INFOPLIST_KEY_NSCalendarsUsageDescription: "LocusCal can show today’s calendar events in the menu bar popover (read-only)."
     INFOPLIST_KEY_NSRemindersUsageDescription: "LocusCal can show today’s reminders in the menu bar popover (read-only)."
+    INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "LocusCal can show today’s calendar events in the menu bar popover (read-only)."
+    INFOPLIST_KEY_NSRemindersFullAccessUsageDescription: "LocusCal can show today’s reminders in the menu bar popover (read-only)."
 targets:
   LocusCal:
     type: application

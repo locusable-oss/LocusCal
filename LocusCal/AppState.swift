@@ -11,10 +11,16 @@ final class AppState: ObservableObject {
     @Published var refreshTick = 0
 
     private let calendar = Calendar.current
+    private var eventKitForward: AnyCancellable?
 
     init(holidays: HolidayStore = .loadFromBundle()) {
         self.holidays = holidays
         self.visibleMonth = Date()
+        eventKit.bind(preferences)
+        // Nested ObservableObject updates do not refresh MenuBarExtra on their own.
+        eventKitForward = eventKit.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     func bump() { refreshTick &+= 1 }
