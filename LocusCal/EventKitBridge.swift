@@ -19,10 +19,21 @@ private final class EventKitObserverBag {
     }
 }
 
+private func displayTitle(_ raw: String?, fallback: String) -> String {
+    let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return trimmed.isEmpty ? fallback : trimmed
+}
+
+private func dueSortKey(_ reminder: EKReminder) -> Date {
+    guard let parts = reminder.dueDateComponents else { return .distantFuture }
+    return Calendar.current.date(from: parts) ?? .distantFuture
+}
+
 @MainActor
 final class EventKitBridge: ObservableObject {
     @Published var events: [String] = []
     @Published var reminders: [String] = []
+    @Published private(set) var isRefreshing = false
 
     private struct Access: Equatable {
         var events: Bool
@@ -74,6 +85,7 @@ final class EventKitBridge: ObservableObject {
     func requestAccessIfNeeded() async {
         if accessFlowInFlight { return }
         accessFlowInFlight = true
+        isRefreshing = true
         defer { accessFlowInFlight = false }
         changeTask?.cancel()
 
@@ -113,6 +125,7 @@ final class EventKitBridge: ObservableObject {
         guard access.any else {
             publishEvents([])
             publishReminders([])
+            isRefreshing = false
             return
         }
         ensureReadableStore(accessChanged: changed)
@@ -174,21 +187,17 @@ final class EventKitBridge: ObservableObject {
         let generation = reminderFetchGeneration
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: Date())
-        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return }
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else {
+            isRefreshing = false
+            return
+        }
 
         if access.events {
             let predicate = store.predicateForEvents(withStart: start, end: end, calendars: nil)
             let lines = store.events(matching: predicate)
                 .sorted { $0.startDate < $1.startDate }
                 .prefix(8)
-                .map { event -> String in
-                    let time = DateFormatter.localizedString(
-                        from: event.startDate,
-                        dateStyle: .none,
-                        timeStyle: .short
-                    )
-                    return "\(time) \(event.title ?? "无标题")"
-                }
+                .map { eventLine($0, dayStart: start, calendar: calendar) }
             publishEvents(Array(lines))
         } else {
             publishEvents([])
@@ -196,20 +205,43 @@ final class EventKitBridge: ObservableObject {
 
         guard access.reminders else {
             publishReminders([])
+            isRefreshing = false
             return
         }
+
+        isRefreshing = true
         let predicate = store.predicateForIncompleteReminders(
             withDueDateStarting: start,
             ending: end,
             calendars: nil
         )
         store.fetchReminders(matching: predicate) { [weak self] items in
-            let titles = Array((items ?? []).prefix(8).map { $0.title ?? "提醒" })
+            let titles = (items ?? [])
+                .sorted { dueSortKey($0) < dueSortKey($1) }
+                .prefix(8)
+                .map { displayTitle($0.title, fallback: "提醒") }
             Task { @MainActor in
                 guard let self, self.reminderFetchGeneration == generation else { return }
                 self.publishReminders(titles)
+                self.isRefreshing = false
             }
         }
+    }
+
+    private func eventLine(_ event: EKEvent, dayStart: Date, calendar: Calendar) -> String {
+        let title = displayTitle(event.title, fallback: "无标题")
+        if event.isAllDay {
+            return "全天 \(title)"
+        }
+        if !calendar.isDate(event.startDate, inSameDayAs: dayStart) {
+            return "跨天 \(title)"
+        }
+        let time = DateFormatter.localizedString(
+            from: event.startDate,
+            dateStyle: .none,
+            timeStyle: .short
+        )
+        return "\(time) \(title)"
     }
 
     private func publishEvents(_ next: [String]) {

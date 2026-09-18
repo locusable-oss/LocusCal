@@ -8,19 +8,19 @@ struct SettingsView: View {
             Section("显示") {
                 Toggle("显示农历日注", isOn: Binding(
                     get: { appState.preferences.showLunar },
-                    set: { appState.preferences.showLunar = $0; appState.objectWillChange.send() }
+                    set: { appState.preferences.showLunar = $0 }
                 ))
                 Toggle("周起始为周一", isOn: Binding(
                     get: { appState.preferences.weekStartsOnMonday },
-                    set: { appState.preferences.weekStartsOnMonday = $0; appState.objectWillChange.send() }
+                    set: { appState.preferences.weekStartsOnMonday = $0 }
                 ))
                 Toggle("菜单栏显示日期", isOn: Binding(
                     get: { appState.preferences.menuBarShowsDate },
-                    set: { appState.preferences.menuBarShowsDate = $0; appState.objectWillChange.send() }
+                    set: { appState.preferences.menuBarShowsDate = $0 }
                 ))
                 Toggle("菜单栏显示休/班", isOn: Binding(
                     get: { appState.preferences.menuBarShowsHoliday },
-                    set: { appState.preferences.menuBarShowsHoliday = $0; appState.objectWillChange.send() }
+                    set: { appState.preferences.menuBarShowsHoliday = $0 }
                 ))
             }
             Section("系统") {
@@ -30,9 +30,11 @@ struct SettingsView: View {
                 ))
                 Toggle("显示系统日历与提醒（只读）", isOn: Binding(
                     get: { appState.preferences.showEventKit },
-                    set: { appState.preferences.showEventKit = $0
-                        if $0 { Task { await appState.eventKit.requestAccessIfNeeded() } }
-                        appState.objectWillChange.send()
+                    set: { enabled in
+                        appState.preferences.showEventKit = enabled
+                        if enabled {
+                            Task { await appState.eventKit.requestAccessIfNeeded() }
+                        }
                     }
                 ))
             }
@@ -42,7 +44,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding()
         .formStyle(.grouped)
     }
 }

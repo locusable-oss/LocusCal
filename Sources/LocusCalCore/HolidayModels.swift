@@ -19,18 +19,11 @@ public struct HolidayYearFile: Codable, Sendable {
 
 public struct HolidayStore: Sendable {
     private let byYear: [Int: HolidayYearFile]
-    private let dateFormatter: DateFormatter
 
     public init(files: [HolidayYearFile]) {
         var map: [Int: HolidayYearFile] = [:]
-        for f in files { map[f.year] = f }
+        for file in files { map[file.year] = file }
         self.byYear = map
-        let df = DateFormatter()
-        df.calendar = Calendar(identifier: .gregorian)
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.timeZone = TimeZone.current
-        df.dateFormat = "yyyy-MM-dd"
-        self.dateFormatter = df
     }
 
     public static func loadFromBundle(_ bundle: Bundle = .main) -> HolidayStore {
@@ -49,15 +42,20 @@ public struct HolidayStore: Sendable {
         return HolidayStore(files: files)
     }
 
+    /// Gregorian civil date in the current time zone. A non-Gregorian system calendar must not change the year key.
     public func mark(on date: Date) -> DayMark? {
-        let key = dateFormatter.string(from: date)
-        let year = Calendar.current.component(.year, from: date)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        guard let year = parts.year, let month = parts.month, let day = parts.day else { return nil }
+        let key = String(format: "%04d-%02d-%02d", year, month, day)
         return byYear[year]?.days[key]
     }
 
     public func hasData(for year: Int) -> Bool {
-        guard let f = byYear[year] else { return false }
-        return !f.days.isEmpty
+        guard let file = byYear[year] else { return false }
+        return !file.days.isEmpty
     }
 
     public func summary(on date: Date) -> String? {

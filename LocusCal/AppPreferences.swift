@@ -20,8 +20,14 @@ final class AppPreferences: ObservableObject {
         didSet { UserDefaults.standard.set(showEventKit, forKey: Keys.showEventKit) }
     }
     @Published var launchAtLogin: Bool {
-        didSet { applyLaunchAtLogin() }
+        didSet {
+            guard !suppressLaunchAtLoginWrite else { return }
+            applyLaunchAtLogin()
+        }
     }
+
+    /// System Settings is the source of truth. A failed register must not leave the toggle on.
+    private var suppressLaunchAtLoginWrite = false
 
     private enum Keys {
         static let showLunar = "showLunar"
@@ -33,27 +39,41 @@ final class AppPreferences: ObservableObject {
     }
 
     init() {
-        let d = UserDefaults.standard
-        showLunar = d.object(forKey: Keys.showLunar) as? Bool ?? true
-        weekStartsOnMonday = d.object(forKey: Keys.weekStartsOnMonday) as? Bool ?? true
-        menuBarShowsHoliday = d.object(forKey: Keys.menuBarShowsHoliday) as? Bool ?? true
-        menuBarShowsDate = d.object(forKey: Keys.menuBarShowsDate) as? Bool ?? true
-        showEventKit = d.object(forKey: Keys.showEventKit) as? Bool ?? false
-        launchAtLogin = d.object(forKey: Keys.launchAtLogin) as? Bool ?? false
+        let defaults = UserDefaults.standard
+        showLunar = defaults.object(forKey: Keys.showLunar) as? Bool ?? true
+        weekStartsOnMonday = defaults.object(forKey: Keys.weekStartsOnMonday) as? Bool ?? true
+        menuBarShowsHoliday = defaults.object(forKey: Keys.menuBarShowsHoliday) as? Bool ?? true
+        menuBarShowsDate = defaults.object(forKey: Keys.menuBarShowsDate) as? Bool ?? true
+        showEventKit = defaults.object(forKey: Keys.showEventKit) as? Bool ?? false
+        launchAtLogin = Self.systemLaunchAtLogin
+    }
+
+    private static var systemLaunchAtLogin: Bool {
+        switch SMAppService.mainApp.status {
+        case .enabled, .requiresApproval:
+            return true
+        default:
+            return false
+        }
     }
 
     private func applyLaunchAtLogin() {
         UserDefaults.standard.set(launchAtLogin, forKey: Keys.launchAtLogin)
-        if #available(macOS 13.0, *) {
-            do {
-                if launchAtLogin {
+        do {
+            let status = SMAppService.mainApp.status
+            if launchAtLogin {
+                if status != .enabled && status != .requiresApproval {
                     try SMAppService.mainApp.register()
-                } else {
-                    try SMAppService.mainApp.unregister()
                 }
-            } catch {
-                // degrade silently; Settings can re-toggle
+            } else if status == .enabled || status == .requiresApproval {
+                try SMAppService.mainApp.unregister()
             }
+        } catch {
+            let actual = Self.systemLaunchAtLogin
+            UserDefaults.standard.set(actual, forKey: Keys.launchAtLogin)
+            suppressLaunchAtLoginWrite = true
+            launchAtLogin = actual
+            suppressLaunchAtLoginWrite = false
         }
     }
 }

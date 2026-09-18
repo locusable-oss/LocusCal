@@ -16,10 +16,10 @@ settings:
     INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
     INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026 Locusable Studio"
     INFOPLIST_KEY_LSUIElement: YES
-    INFOPLIST_KEY_NSCalendarsUsageDescription: "LocusCal can show today’s calendar events in the menu bar popover (read-only)."
-    INFOPLIST_KEY_NSRemindersUsageDescription: "LocusCal can show today’s reminders in the menu bar popover (read-only)."
-    INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "LocusCal can show today’s calendar events in the menu bar popover (read-only)."
-    INFOPLIST_KEY_NSRemindersFullAccessUsageDescription: "LocusCal can show today’s reminders in the menu bar popover (read-only)."
+    INFOPLIST_KEY_NSCalendarsUsageDescription: "在菜单栏弹层中只读显示今天的日程。"
+    INFOPLIST_KEY_NSRemindersUsageDescription: "在菜单栏弹层中只读显示今天的提醒事项。"
+    INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "在菜单栏弹层中只读显示今天的日程。"
+    INFOPLIST_KEY_NSRemindersFullAccessUsageDescription: "在菜单栏弹层中只读显示今天的提醒事项。"
 targets:
   LocusCal:
     type: application

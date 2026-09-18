@@ -19,16 +19,19 @@ struct PopoverRootView: View {
                 Button {
                     openSettings()
                 } label: {
-                    Label("设置", systemImage: "gear")
+                    Label("设置", systemImage: "gearshape")
                 }
                 .buttonStyle(.borderless)
                 Spacer()
-                Button("退出") {
+                Button {
                     NSApp.terminate(nil)
+                } label: {
+                    Label("退出", systemImage: "power")
                 }
                 .buttonStyle(.borderless)
             }
-            .padding(10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
         }
         .background(.regularMaterial)
         // Width only. A fixed height centered this panel and left empty
